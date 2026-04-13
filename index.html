@@ -44,10 +44,82 @@ input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-app
 .customer-name-row input { font-weight: 500; font-size: 14px; }
 .payment-date-row { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; font-size: 13px; color: #666; }
 .payment-date-row input { width: 170px; }
-.event-hdr { display: grid; grid-template-columns: 90px minmax(0,2fr) 60px minmax(0,1fr) 28px; gap: 5px; margin-bottom: 4px; }
-.event-hdr span { font-size: 11px; color: #999; }
-.event-row { display: grid; grid-template-columns: 90px minmax(0,2fr) 60px minmax(0,1fr) 28px; gap: 5px; align-items: center; margin-bottom: 5px; }
-.add-event-row { display: flex; gap: 8px; margin-top: 8px; }
+
+/* ── Cluster styles ─────────────────────────────── */
+.cluster {
+  border: 1px solid #e8e8e2;
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  background: #fafaf8;
+}
+.cluster-hdr {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.cluster-hdr input[type=date] {
+  flex: 1;
+  min-width: 0;
+  max-width: 160px;
+  height: 30px;
+  font-size: 13px;
+}
+.type-seg {
+  display: inline-flex;
+  border: 1px solid #ddd;
+  border-radius: 7px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.type-seg button {
+  height: 30px;
+  padding: 0 11px;
+  font-size: 12px;
+  border: none;
+  background: #fff;
+  color: #888;
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+}
+.type-seg button:first-child { border-right: 1px solid #ddd; }
+.type-seg button.active-rent  { background: #e8f5e9; color: #2e7d32; font-weight: 600; }
+.type-seg button.active-return { background: #fff3e0; color: #e65100; font-weight: 600; }
+.cluster-items-hdr {
+  display: grid;
+  grid-template-columns: minmax(0,2fr) 72px 28px;
+  gap: 5px;
+  margin-bottom: 4px;
+  padding: 0 2px;
+}
+.cluster-items-hdr span { font-size: 11px; color: #999; }
+.cluster-item-row {
+  display: grid;
+  grid-template-columns: minmax(0,2fr) 72px 28px;
+  gap: 5px;
+  align-items: center;
+  margin-bottom: 5px;
+}
+.cluster-item-row input[type=number] { height: 32px; text-align: center; }
+.cluster-item-row select { height: 32px; }
+.add-item-btn {
+  height: 26px;
+  padding: 0 10px;
+  font-size: 11px;
+  border: 1px dashed #ccc;
+  border-radius: 6px;
+  background: transparent;
+  color: #888;
+  cursor: pointer;
+  font-family: inherit;
+  margin-top: 4px;
+}
+.add-item-btn:hover { background: #f0f0ec; border-color: #aaa; color: #555; }
+.add-cluster-row { display: flex; gap: 8px; margin-top: 4px; }
+/* ─────────────────────────────────────────────── */
+
 .empty { color: #aaa; font-size: 13px; text-align: center; padding: 2.5rem 0; }
 .summary-cards { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px; margin-bottom: 20px; }
 .scard { background: #fff; border: 1px solid #e5e5e0; border-radius: 10px; padding: 14px 16px; }
@@ -84,7 +156,7 @@ input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-app
 #install-banner .dismiss { background: transparent; color: #aaa; padding: 5px; }
 
 @media print {
-  .topbar, .tab-bar, .top-actions, .add-event-row, .del-btn, .btn, .customer-name-row button, #install-banner { display: none !important; }
+  .topbar, .tab-bar, .top-actions, .add-cluster-row, .add-item-btn, .del-btn, .btn, .customer-name-row button, #install-banner { display: none !important; }
   body { background: #fff; }
   .panel { display: block !important; }
   #panel-orders, #panel-materials { display: none !important; }
@@ -92,8 +164,8 @@ input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-app
 }
 @media (max-width: 600px) {
   .summary-cards { grid-template-columns: repeat(2, 1fr); }
-  .event-hdr, .event-row { grid-template-columns: 80px minmax(0,1.5fr) 50px minmax(0,1fr) 28px; }
   .bill-seg-row { grid-template-columns: minmax(0,2fr) 30px 30px 30px 30px minmax(0,1fr); font-size: 11px; }
+  .cluster-hdr input[type=date] { max-width: 140px; }
 }
 </style>
 </head>
@@ -162,7 +234,7 @@ input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-app
 
 <script>
 let matIdC = 10, orderIdC = 1;
-let billingMode = 'normal'; // 'normal' = excludes one day, 'both' = counts both start & end day
+let billingMode = 'normal';
 let materials = [
   { id:1, name:'ਪਲੇਟ',    rate:2 },
   { id:2, name:'ਸਪੋਰਟ',   rate:2 },
@@ -173,35 +245,62 @@ let materials = [
 ];
 let orders = [];
 
+// ── Persist ──────────────────────────────────────────────────────────────────
 function save() {
-  try { localStorage.setItem('rental_materials', JSON.stringify(materials)); localStorage.setItem('rental_orders', JSON.stringify(orders)); localStorage.setItem('rental_idc', JSON.stringify({matIdC, orderIdC})); localStorage.setItem('rental_billing_mode', billingMode); } catch(e){}
+  try {
+    localStorage.setItem('rental_materials', JSON.stringify(materials));
+    localStorage.setItem('rental_orders',    JSON.stringify(orders));
+    localStorage.setItem('rental_idc',       JSON.stringify({matIdC, orderIdC}));
+    localStorage.setItem('rental_billing_mode', billingMode);
+  } catch(e){}
 }
+
 function load() {
   try {
     const m = localStorage.getItem('rental_materials'); if(m) materials = JSON.parse(m);
-    const o = localStorage.getItem('rental_orders'); if(o) orders = JSON.parse(o);
-    const c = localStorage.getItem('rental_idc'); if(c) { const x=JSON.parse(c); matIdC=x.matIdC; orderIdC=x.orderIdC; }
+    const o = localStorage.getItem('rental_orders');    if(o) orders    = JSON.parse(o);
+    const c = localStorage.getItem('rental_idc');       if(c) { const x=JSON.parse(c); matIdC=x.matIdC; orderIdC=x.orderIdC; }
     const bm = localStorage.getItem('rental_billing_mode'); if(bm) billingMode = bm;
   } catch(e){}
-  // Migrate old English names to Punjabi by ID
+
+  // Migrate old Punjabi/English material names
   const nameMap = {1:'ਪਲੇਟ', 2:'ਸਪੋਰਟ', 3:'ਗੌਡਰ', 4:'ਚੈਨਰ', 5:'ਫੱਟੇ', 6:'ਚਿੱਲੀਆ'};
   const englishNames = ['Plate','Support','Gauder','Channer','Fatte','Chillia'];
   materials.forEach(m => { if(nameMap[m.id] && englishNames.includes(m.name)) m.name = nameMap[m.id]; });
+
+  // Migrate old flat events → clusters
+  orders.forEach(o => {
+    if (o.events && !o.clusters) {
+      let clId = 1;
+      o.clusters = o.events.map(ev => ({
+        id: clId++,
+        type: ev.type || 'rent',
+        date: ev.date || '',
+        clItemIdC: 2,
+        items: [{ id: 1, matId: ev.matId, qty: ev.qty }]
+      }));
+      o.clIdC = clId;
+      delete o.events;
+    }
+    // Ensure clIdC exists
+    if (!o.clIdC) o.clIdC = (o.clusters?.length || 0) + 1;
+  });
+
   save();
 }
 
+// ── Tabs ─────────────────────────────────────────────────────────────────────
 function switchTab(tab) {
   document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', ['orders','bills','materials'][i]===tab));
   document.querySelectorAll('.panel').forEach((p,i) => p.classList.toggle('active', ['panel-orders','panel-bills','panel-materials'][i]==='panel-'+tab));
-  if(tab==='bills') { updateModeToggleUI(); renderBills(); }
+  if(tab==='bills')     { updateModeToggleUI(); renderBills(); }
   if(tab==='materials') renderMaterials();
 }
 
+// ── Materials ─────────────────────────────────────────────────────────────────
 function matOptions(selId) {
   return materials.map(m=>`<option value="${m.id}" ${m.id==selId?'selected':''}>${m.name} (₹${m.rate}/ਦਿਨ)</option>`).join('');
 }
-
-// MATERIALS
 function renderMaterials() {
   document.getElementById('mat-list').innerHTML = materials.map(m=>`
     <div class="mat-row">
@@ -210,31 +309,97 @@ function renderMaterials() {
       <button class="del-btn" onclick="deleteMat(${m.id})">×</button>
     </div>`).join('');
 }
-function addMaterial() { materials.push({id:matIdC++,name:'',rate:0}); save(); renderMaterials(); }
-function updateMat(id,field,val) { const m=materials.find(x=>x.id===id); if(m){m[field]=field==='rate'?parseFloat(val)||0:val;} save(); }
-function deleteMat(id) { materials=materials.filter(x=>x.id!==id); save(); renderMaterials(); }
+function addMaterial()            { materials.push({id:matIdC++,name:'',rate:0}); save(); renderMaterials(); }
+function updateMat(id,field,val)  { const m=materials.find(x=>x.id===id); if(m){m[field]=field==='rate'?parseFloat(val)||0:val;} save(); }
+function deleteMat(id)            { materials=materials.filter(x=>x.id!==id); save(); renderMaterials(); }
 
-// ORDERS
+// ── Orders ────────────────────────────────────────────────────────────────────
 function addOrder() {
   const today = new Date().toISOString().split('T')[0];
-  orders.push({ id:orderIdC++, customer:'', paymentDate:today, events:[{id:1,type:'rent',matId:materials[0]?.id,qty:1,date:''}], evIdC:2 });
-  save(); renderOrders();
-}
-function updateOrder(id,field,val) { const o=orders.find(x=>x.id===id); if(o) o[field]=val; save(); if(field==='paymentDate') renderOrders(); }
-function deleteOrder(id) { if(!confirm('ਕੀ ਇਸ ਗਾਹਕ ਨੂੰ ਹਟਾਉਣਾ ਹੈ?')) return; orders=orders.filter(x=>x.id!==id); save(); renderOrders(); }
-function addEvent(orderId,type) { const o=orders.find(x=>x.id===orderId); if(!o) return; o.events.push({id:o.evIdC++,type,matId:materials[0]?.id,qty:1,date:''}); save(); renderOrders(); }
-function deleteEvent(orderId,evId) { const o=orders.find(x=>x.id===orderId); if(o) o.events=o.events.filter(e=>e.id!==evId); save(); renderOrders(); }
-function updateEvent(orderId,evId,field,val) {
-  const o=orders.find(x=>x.id===orderId); if(!o) return;
-  const ev=o.events.find(e=>e.id===evId); if(!ev) return;
-  ev[field]=field==='qty'?parseInt(val)||1:(field==='matId'?parseInt(val):val);
+  orders.push({
+    id: orderIdC++,
+    customer: '',
+    paymentDate: today,
+    clIdC: 2,
+    clusters: [{
+      id: 1,
+      type: 'rent',
+      date: '',
+      clItemIdC: 2,
+      items: [{ id:1, matId: materials[0]?.id, qty: 1 }]
+    }]
+  });
   save(); renderOrders();
 }
 
+function updateOrder(id, field, val) {
+  const o = orders.find(x=>x.id===id);
+  if(o) o[field] = val;
+  save();
+  if(field==='paymentDate') renderOrders();
+}
+
+function deleteOrder(id) {
+  if(!confirm('ਕੀ ਇਸ ਗਾਹਕ ਨੂੰ ਹਟਾਉਣਾ ਹੈ?')) return;
+  orders = orders.filter(x=>x.id!==id);
+  save(); renderOrders();
+}
+
+// Cluster CRUD
+function addCluster(orderId, type) {
+  const o = orders.find(x=>x.id===orderId); if(!o) return;
+  o.clusters.push({
+    id: o.clIdC++,
+    type,
+    date: '',
+    clItemIdC: 2,
+    items: [{ id:1, matId: materials[0]?.id, qty:1 }]
+  });
+  save(); renderOrders();
+}
+
+function deleteCluster(orderId, clusterId) {
+  const o = orders.find(x=>x.id===orderId); if(!o) return;
+  o.clusters = o.clusters.filter(c=>c.id!==clusterId);
+  save(); renderOrders();
+}
+
+function updateCluster(orderId, clusterId, field, val) {
+  const o = orders.find(x=>x.id===orderId); if(!o) return;
+  const c = o.clusters.find(c=>c.id===clusterId); if(!c) return;
+  c[field] = val;
+  save(); renderOrders();
+}
+
+// Item CRUD within a cluster
+function addItem(orderId, clusterId) {
+  const o = orders.find(x=>x.id===orderId); if(!o) return;
+  const c = o.clusters.find(c=>c.id===clusterId); if(!c) return;
+  c.items.push({ id: c.clItemIdC++, matId: materials[0]?.id, qty: 1 });
+  save(); renderOrders();
+}
+
+function deleteItem(orderId, clusterId, itemId) {
+  const o = orders.find(x=>x.id===orderId); if(!o) return;
+  const c = o.clusters.find(c=>c.id===clusterId); if(!c) return;
+  if(c.items.length <= 1) { deleteCluster(orderId, clusterId); return; }
+  c.items = c.items.filter(i=>i.id!==itemId);
+  save(); renderOrders();
+}
+
+function updateItem(orderId, clusterId, itemId, field, val) {
+  const o = orders.find(x=>x.id===orderId); if(!o) return;
+  const c = o.clusters.find(c=>c.id===clusterId); if(!c) return;
+  const item = c.items.find(i=>i.id===itemId); if(!item) return;
+  item[field] = field==='qty' ? parseInt(val)||1 : (field==='matId' ? parseInt(val) : val);
+  save(); renderOrders();
+}
+
+// ── Render Orders ─────────────────────────────────────────────────────────────
 function renderOrders() {
-  const el=document.getElementById('order-list');
-  if(!orders.length){el.innerHTML='<p class="empty">ਅਜੇ ਕੋਈ ਗਾਹਕ ਨਹੀਂ। ਸ਼ੁਰੂ ਕਰਨ ਲਈ "+ ਨਵਾਂ ਗਾਹਕ" ਦਬਾਓ।</p>';return;}
-  el.innerHTML=orders.map(o=>`
+  const el = document.getElementById('order-list');
+  if(!orders.length) { el.innerHTML='<p class="empty">ਅਜੇ ਕੋਈ ਗਾਹਕ ਨਹੀਂ। ਸ਼ੁਰੂ ਕਰਨ ਲਈ "+ ਨਵਾਂ ਗਾਹਕ" ਦਬਾਓ।</p>'; return; }
+  el.innerHTML = orders.map(o => `
     <div class="card">
       <div class="customer-name-row">
         <input type="text" value="${o.customer}" oninput="updateOrder(${o.id},'customer',this.value)" placeholder="ਗਾਹਕ ਦਾ ਨਾਮ" style="font-size:14px;font-weight:500;"/>
@@ -244,66 +409,75 @@ function renderOrders() {
         <span>ਭੁਗਤਾਨ ਤਾਰੀਖ:</span>
         <input type="date" value="${o.paymentDate}" onchange="updateOrder(${o.id},'paymentDate',this.value)" style="width:170px;"/>
       </div>
-      <div class="event-hdr">
-        <span>ਕਿਸਮ</span><span>ਮਟੀਰੀਅਲ</span><span>ਮਾਤਰਾ</span><span>ਤਾਰੀਖ</span><span></span>
-      </div>
-      ${o.events.map(ev=>`
-        <div class="event-row">
-          <select onchange="updateEvent(${o.id},${ev.id},'type',this.value)">
-            <option value="rent" ${ev.type==='rent'?'selected':''}>ਲਗਾਇਆ</option>
-            <option value="return" ${ev.type==='return'?'selected':''}>ਜਮਾ</option>
-          </select>
-          <select onchange="updateEvent(${o.id},${ev.id},'matId',this.value)">${matOptions(ev.matId)}</select>
-          <input type="number" value="${ev.qty}" min="1" onfocus="this.select()" onchange="updateEvent(${o.id},${ev.id},'qty',this.value)"/>
-          <input type="date" value="${ev.date}" onchange="updateEvent(${o.id},${ev.id},'date',this.value)"/>
-          <button class="del-btn" onclick="deleteEvent(${o.id},${ev.id})">×</button>
+
+      ${(o.clusters||[]).map(c => `
+        <div class="cluster">
+          <div class="cluster-hdr">
+            <div class="type-seg">
+              <button class="${c.type==='rent'?'active-rent':''}" onclick="updateCluster(${o.id},${c.id},'type','rent')">⬆ ਲਗਾਇਆ</button>
+              <button class="${c.type==='return'?'active-return':''}" onclick="updateCluster(${o.id},${c.id},'type','return')">⬇ ਜਮਾ</button>
+            </div>
+            <input type="date" value="${c.date}" onchange="updateCluster(${o.id},${c.id},'date',this.value)"/>
+            <button class="del-btn" onclick="deleteCluster(${o.id},${c.id})" title="ਇਹ ਤਾਰੀਖ ਮਿਟਾਓ">×</button>
+          </div>
+          <div class="cluster-items-hdr">
+            <span>ਮਟੀਰੀਅਲ</span><span>ਮਾਤਰਾ</span><span></span>
+          </div>
+          ${c.items.map(item => `
+            <div class="cluster-item-row">
+              <select onchange="updateItem(${o.id},${c.id},${item.id},'matId',this.value)">${matOptions(item.matId)}</select>
+              <input type="number" value="${item.qty}" min="1" onfocus="this.select()" onchange="updateItem(${o.id},${c.id},${item.id},'qty',this.value)"/>
+              <button class="del-btn" onclick="deleteItem(${o.id},${c.id},${item.id})">×</button>
+            </div>`).join('')}
+          <button class="add-item-btn" onclick="addItem(${o.id},${c.id})">+ ਮਟੀਰੀਅਲ ਜੋੜੋ</button>
         </div>`).join('')}
-      <div class="add-event-row">
-        <button class="btn" onclick="addEvent(${o.id},'rent')">+ ਲਗਾਇਆ</button>
-        <button class="btn" onclick="addEvent(${o.id},'return')">+ ਜਮਾ</button>
+
+      <div class="add-cluster-row">
+        <button class="btn" onclick="addCluster(${o.id},'rent')"  style="color:#2e7d32;border-color:#a5d6a7;">+ ਲਗਾਇਆ ਤਾਰੀਖ</button>
+        <button class="btn" onclick="addCluster(${o.id},'return')" style="color:#e65100;border-color:#ffcc80;">+ ਜਮਾ ਤਾਰੀਖ</button>
       </div>
     </div>`).join('');
 }
 
-function setBillingMode(mode) {
-  billingMode = mode;
-  save();
-  document.getElementById('btn-mode-normal').classList.toggle('active', mode === 'normal');
-  document.getElementById('btn-mode-both').classList.toggle('active', mode === 'both');
-  renderBills();
+// ── Billing ───────────────────────────────────────────────────────────────────
+// Flatten clusters → flat events array for calc
+function flattenEvents(o) {
+  const evs = [];
+  (o.clusters || []).forEach(c => {
+    c.items.forEach(item => {
+      evs.push({ type: c.type, date: c.date, matId: item.matId, qty: item.qty });
+    });
+  });
+  return evs;
 }
 
-function updateModeToggleUI() {
-  const normalBtn = document.getElementById('btn-mode-normal');
-  const bothBtn = document.getElementById('btn-mode-both');
-  if (normalBtn && bothBtn) {
-    normalBtn.classList.toggle('active', billingMode === 'normal');
-    bothBtn.classList.toggle('active', billingMode === 'both');
-  }
-}
-
-// BILLING
 function calcOrder(o) {
   if(!o.paymentDate) return {allSegments:[],grandTotal:0,totalDays:0};
-  const payDate=new Date(o.paymentDate);
-  const matIds=[...new Set(o.events.map(e=>e.matId))];
-  let allSegments=[],grandTotal=0,totalDays=0;
-  matIds.forEach(matId=>{
-    const mat=materials.find(m=>m.id===matId); if(!mat) return;
-    const evs=o.events.filter(e=>e.matId===matId&&e.date).sort((a,b)=>new Date(a.date)-new Date(b.date));
+  const payDate = new Date(o.paymentDate);
+  const events  = flattenEvents(o);
+  const matIds  = [...new Set(events.map(e=>e.matId))];
+  let allSegments=[], grandTotal=0, totalDays=0;
+
+  matIds.forEach(matId => {
+    const mat = materials.find(m=>m.id===matId); if(!mat) return;
+    const evs = events.filter(e=>e.matId===matId && e.date).sort((a,b)=>new Date(a.date)-new Date(b.date));
     if(!evs.length) return;
     let runningQty=0, segments=[];
     for(let i=0;i<evs.length;i++){
-      const ev=evs[i];
-      const fromDate=new Date(ev.date);
-      const toDate=i+1<evs.length?new Date(evs[i+1].date):payDate;
-      if(ev.type==='rent') runningQty+=ev.qty;
-      else if(ev.type==='return') { const excess=ev.qty>runningQty; runningQty=Math.max(0,runningQty-ev.qty); if(excess) { segments.push({mat,type:ev.type,qty:ev.qty,runningQty,from:ev.date,to:i+1<evs.length?evs[i+1].date:o.paymentDate,days:0,amount:0,missing:false,excess:true}); continue; } }
-      const days=Math.max(0,Math.round((toDate-fromDate)/86400000))+(billingMode==='both'?1:0);
-      const amount=runningQty*days*mat.rate;
-      const isLast=(i===evs.length-1);
-      const missing=isLast&&runningQty>0;
-      grandTotal+=amount; totalDays+=runningQty*days;
+      const ev = evs[i];
+      const fromDate = new Date(ev.date);
+      const toDate   = i+1<evs.length ? new Date(evs[i+1].date) : payDate;
+      if(ev.type==='rent') runningQty += ev.qty;
+      else if(ev.type==='return') {
+        const excess = ev.qty > runningQty;
+        runningQty = Math.max(0, runningQty - ev.qty);
+        if(excess) { segments.push({mat,type:ev.type,qty:ev.qty,runningQty,from:ev.date,to:i+1<evs.length?evs[i+1].date:o.paymentDate,days:0,amount:0,missing:false,excess:true}); continue; }
+      }
+      const days   = Math.max(0, Math.round((toDate-fromDate)/86400000)) + (billingMode==='both'?1:0);
+      const amount = runningQty * days * mat.rate;
+      const isLast = i === evs.length-1;
+      const missing = isLast && runningQty > 0;
+      grandTotal += amount; totalDays += runningQty * days;
       segments.push({mat,type:ev.type,qty:ev.qty,runningQty,from:ev.date,to:i+1<evs.length?evs[i+1].date:o.paymentDate,days,amount,missing});
     }
     allSegments.push({mat,segments});
@@ -341,29 +515,23 @@ function renderBills(){
             if (s.excess) return `
               <div class="bill-seg-row excess-row">
                 <span>${fmt(s.from)} → <b>ਵੱਧ ਜਮਾ</b></span>
-                <span>0</span>
-                <span style="font-weight:600;">${s.qty}</span>
-                <span>—</span>
-                <span>—</span>
+                <span>0</span><span style="font-weight:600;">${s.qty}</span>
+                <span>—</span><span>—</span>
                 <span><span class="excess-badge">⚠ ਵੱਧ ਜਮਾ</span></span>
               </div>`;
             const isFullReturn = s.type === 'return' && s.runningQty === 0;
             if (isFullReturn) return `
               <div class="bill-seg-row returned-row">
                 <span>${fmt(s.from)} → ✓ ਸਭ ਜਮਾ</span>
-                <span>0</span>
-                <span style="font-weight:600;color:#27ae60;">${s.qty}</span>
-                <span>—</span>
-                <span>—</span>
-                <span style="font-weight:600;">₹0</span>
+                <span>0</span><span style="font-weight:600;color:#27ae60;">${s.qty}</span>
+                <span>—</span><span>—</span><span style="font-weight:600;">₹0</span>
               </div>`;
             if (s.missing) return `
               <div class="bill-seg-row missing-row">
                 <span>${fmt(s.from)} → <b style="color:#e65100">ਜਮਾ ਨਹੀਂ</b></span>
                 <span>${s.runningQty}</span>
                 <span style="color:${s.type==='return'?'#27ae60':'#ccc'}">${s.type==='return'?s.qty:'—'}</span>
-                <span>—</span>
-                <span>₹${mat.rate}</span>
+                <span>—</span><span>₹${mat.rate}</span>
                 <span><span class="missing-badge">⚠ ਗੁੰਮ</span></span>
               </div>`;
             return `
@@ -371,8 +539,7 @@ function renderBills(){
                 <span>${fmt(s.from)} → ${fmt(s.to)}</span>
                 <span>${s.runningQty}</span>
                 <span style="color:${s.type==='return'?'#27ae60':'#ccc'}">${s.type==='return'?s.qty:'—'}</span>
-                <span>${s.days}</span>
-                <span>₹${mat.rate}</span>
+                <span>${s.days}</span><span>₹${mat.rate}</span>
                 <span style="font-weight:600;">₹${s.amount.toLocaleString('en-IN')}</span>
               </div>`;
           }).join('')}
@@ -391,7 +558,7 @@ function renderBills(){
         </div>` : ''}
     </div>`;
   }).join('');
-  updateSummary(orders.length,grandDays,grandTotal);
+  updateSummary(orders.length, grandDays, grandTotal);
 }
 
 function updateSummary(o,d,a){
@@ -400,7 +567,19 @@ function updateSummary(o,d,a){
   document.getElementById('s-amount').textContent='₹'+a.toLocaleString('en-IN');
 }
 
-// ── Service Worker registration ──────────────────────────────────────────────
+function setBillingMode(mode) {
+  billingMode = mode; save();
+  document.getElementById('btn-mode-normal').classList.toggle('active', mode==='normal');
+  document.getElementById('btn-mode-both').classList.toggle('active',   mode==='both');
+  renderBills();
+}
+function updateModeToggleUI() {
+  const n=document.getElementById('btn-mode-normal');
+  const b=document.getElementById('btn-mode-both');
+  if(n&&b){ n.classList.toggle('active',billingMode==='normal'); b.classList.toggle('active',billingMode==='both'); }
+}
+
+// ── Service Worker ────────────────────────────────────────────────────────────
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js')
@@ -409,15 +588,14 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-// ── PWA install prompt ───────────────────────────────────────────────────────
+// ── PWA install ───────────────────────────────────────────────────────────────
 let deferredInstallPrompt = null;
 window.addEventListener('beforeinstallprompt', e => {
-  e.preventDefault();
-  deferredInstallPrompt = e;
+  e.preventDefault(); deferredInstallPrompt = e;
   document.getElementById('install-banner').style.display = 'flex';
 });
 function installApp() {
-  if (!deferredInstallPrompt) return;
+  if(!deferredInstallPrompt) return;
   deferredInstallPrompt.prompt();
   deferredInstallPrompt.userChoice.then(() => {
     deferredInstallPrompt = null;
@@ -432,4 +610,3 @@ load(); renderOrders(); updateModeToggleUI();
 </script>
 </body>
 </html>
-
