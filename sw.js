@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kiraya-v3';
+const CACHE_NAME = 'kiraya-v4';
 const ASSETS = [
   './',
   './index.html',
