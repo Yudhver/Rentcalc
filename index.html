@@ -74,7 +74,11 @@ input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-app
 .top-actions { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .print-btn { display: flex; align-items: center; gap: 6px; }
 
-/* Install banner */
+.mode-toggle { display: inline-flex; border: 1px solid #ddd; border-radius: 8px; overflow: hidden; }
+.mode-toggle button { height: 32px; padding: 0 13px; font-size: 12px; border: none; background: #fff; color: #888; cursor: pointer; font-family: inherit; border-right: 1px solid #ddd; }
+.mode-toggle button:last-child { border-right: none; }
+.mode-toggle button.active { background: #1a1a1a; color: #fff; font-weight: 500; }
+.mode-toggle button:not(.active):hover { background: #f5f5f3; }
 #install-banner { display: none; position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: #1a1a1a; color: #fff; padding: 10px 16px; border-radius: 10px; font-size: 13px; display: flex; align-items: center; gap: 10px; box-shadow: 0 4px 16px rgba(0,0,0,0.2); z-index: 999; }
 #install-banner button { background: #fff; color: #1a1a1a; border: none; border-radius: 6px; padding: 5px 12px; font-size: 12px; cursor: pointer; font-weight: 500; }
 #install-banner .dismiss { background: transparent; color: #aaa; padding: 5px; }
@@ -120,7 +124,13 @@ input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-app
   <div class="panel" id="panel-bills">
     <div class="top-actions">
       <p class="section-label" style="margin:0">ਬਿੱਲ</p>
-      <button class="btn" onclick="window.print()">🖨 ਬਿੱਲ ਛਾਪੋ</button>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div class="mode-toggle" id="mode-toggle">
+          <button id="btn-mode-normal" onclick="setBillingMode('normal')" title="ਸਿਰਫ਼ ਇੱਕ ਦਿਨ ਗਿਣਦਾ ਹੈ (ਸ਼ੁਰੂਆਤੀ ਜਾਂ ਅੰਤਿਮ)">ਆਮ ਮੋਡ</button>
+          <button id="btn-mode-both" onclick="setBillingMode('both')" title="ਦੋਵੇਂ ਦਿਨ ਗਿਣਦਾ ਹੈ">ਦੋਵੇਂ ਦਿਨ</button>
+        </div>
+        <button class="btn" onclick="window.print()">🖨 ਬਿੱਲ ਛਾਪੋ</button>
+      </div>
     </div>
     <div class="summary-cards">
       <div class="scard"><div class="lbl">ਗਾਹਕ</div><div class="val" id="s-orders">0</div></div>
@@ -152,6 +162,7 @@ input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-app
 
 <script>
 let matIdC = 10, orderIdC = 1;
+let billingMode = 'normal'; // 'normal' = excludes one day, 'both' = counts both start & end day
 let materials = [
   { id:1, name:'ਪਲੇਟ',    rate:2 },
   { id:2, name:'ਸਪੋਰਟ',   rate:2 },
@@ -163,13 +174,14 @@ let materials = [
 let orders = [];
 
 function save() {
-  try { localStorage.setItem('rental_materials', JSON.stringify(materials)); localStorage.setItem('rental_orders', JSON.stringify(orders)); localStorage.setItem('rental_idc', JSON.stringify({matIdC, orderIdC})); } catch(e){}
+  try { localStorage.setItem('rental_materials', JSON.stringify(materials)); localStorage.setItem('rental_orders', JSON.stringify(orders)); localStorage.setItem('rental_idc', JSON.stringify({matIdC, orderIdC})); localStorage.setItem('rental_billing_mode', billingMode); } catch(e){}
 }
 function load() {
   try {
     const m = localStorage.getItem('rental_materials'); if(m) materials = JSON.parse(m);
     const o = localStorage.getItem('rental_orders'); if(o) orders = JSON.parse(o);
     const c = localStorage.getItem('rental_idc'); if(c) { const x=JSON.parse(c); matIdC=x.matIdC; orderIdC=x.orderIdC; }
+    const bm = localStorage.getItem('rental_billing_mode'); if(bm) billingMode = bm;
   } catch(e){}
   // Migrate old English names to Punjabi by ID
   const nameMap = {1:'ਪਲੇਟ', 2:'ਸਪੋਰਟ', 3:'ਗੌਡਰ', 4:'ਚੈਨਰ', 5:'ਫੱਟੇ', 6:'ਚਿੱਲੀਆ'};
@@ -181,7 +193,7 @@ function load() {
 function switchTab(tab) {
   document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', ['orders','bills','materials'][i]===tab));
   document.querySelectorAll('.panel').forEach((p,i) => p.classList.toggle('active', ['panel-orders','panel-bills','panel-materials'][i]==='panel-'+tab));
-  if(tab==='bills') renderBills();
+  if(tab==='bills') { updateModeToggleUI(); renderBills(); }
   if(tab==='materials') renderMaterials();
 }
 
@@ -253,6 +265,23 @@ function renderOrders() {
     </div>`).join('');
 }
 
+function setBillingMode(mode) {
+  billingMode = mode;
+  save();
+  document.getElementById('btn-mode-normal').classList.toggle('active', mode === 'normal');
+  document.getElementById('btn-mode-both').classList.toggle('active', mode === 'both');
+  renderBills();
+}
+
+function updateModeToggleUI() {
+  const normalBtn = document.getElementById('btn-mode-normal');
+  const bothBtn = document.getElementById('btn-mode-both');
+  if (normalBtn && bothBtn) {
+    normalBtn.classList.toggle('active', billingMode === 'normal');
+    bothBtn.classList.toggle('active', billingMode === 'both');
+  }
+}
+
 // BILLING
 function calcOrder(o) {
   if(!o.paymentDate) return {allSegments:[],grandTotal:0,totalDays:0};
@@ -270,7 +299,7 @@ function calcOrder(o) {
       const toDate=i+1<evs.length?new Date(evs[i+1].date):payDate;
       if(ev.type==='rent') runningQty+=ev.qty;
       else if(ev.type==='return') { const excess=ev.qty>runningQty; runningQty=Math.max(0,runningQty-ev.qty); if(excess) { segments.push({mat,type:ev.type,qty:ev.qty,runningQty,from:ev.date,to:i+1<evs.length?evs[i+1].date:o.paymentDate,days:0,amount:0,missing:false,excess:true}); continue; } }
-      const days=Math.max(0,Math.round((toDate-fromDate)/86400000));
+      const days=Math.max(0,Math.round((toDate-fromDate)/86400000))+(billingMode==='both'?1:0);
       const amount=runningQty*days*mat.rate;
       const isLast=(i===evs.length-1);
       const missing=isLast&&runningQty>0;
@@ -399,7 +428,8 @@ window.addEventListener('appinstalled', () => {
   document.getElementById('install-banner').style.display = 'none';
 });
 
-load(); renderOrders();
+load(); renderOrders(); updateModeToggleUI();
 </script>
 </body>
 </html>
+
